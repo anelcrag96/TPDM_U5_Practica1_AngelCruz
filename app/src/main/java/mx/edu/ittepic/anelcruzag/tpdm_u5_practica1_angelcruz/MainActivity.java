@@ -3,6 +3,7 @@ package mx.edu.ittepic.anelcruzag.tpdm_u5_practica1_angelcruz;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.support.annotation.NonNull;
@@ -19,65 +20,81 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
-    TextView opciones;
     private static final int MY_PERMISSIONS_REQUEST_RECIEVER_SMS = 0;
-    private static final int PERMISSION_REQUEST_CODE = 1;
-    Base dmbs;
+    final int SEND_SMS_PERMISSION_REQUEST_CODE = 1;
+    static Base basedatos;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        dmbs = new Base(this, "TPDMU5P1", null, 1);
-        opciones = findViewById(R.id.txtMensaje);
-        opciones.setText("1. SUERTE signo\n2. AMOR signo\n3. RESULTADOS equipo\n4. CHISME");
+        basedatos = new Base(this, "TPDMU5P1", null, 1);
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_DENIED) {
-                Log.d("permission", "permission denied to SEND_SMS - requesting it");
-                String[] permissions = {Manifest.permission.SEND_SMS};
-                requestPermissions(permissions, PERMISSION_REQUEST_CODE);
-            }//if
+        if(!checkPermission(Manifest.permission.SEND_SMS)){
+            ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.SEND_SMS},SEND_SMS_PERMISSION_REQUEST_CODE);
         }//if
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECEIVE_SMS)) {
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECEIVE_SMS)!=PackageManager.PERMISSION_GRANTED){
+            if(!ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.RECEIVE_SMS)){
+                ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.RECEIVE_SMS},MY_PERMISSIONS_REQUEST_RECIEVER_SMS);
             }//if
-            else {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS}, MY_PERMISSIONS_REQUEST_RECIEVER_SMS);
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, MY_PERMISSIONS_REQUEST_RECIEVER_SMS);
-            }//else
         }//if
-        // insercion();
     }// onCreate
 
-
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_RECIEVER_SMS: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(this, "Permiso concedido", Toast.LENGTH_LONG).show();
                 }//if
                 else {
-                    Toast.makeText(this, "SIN PERMISO", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Sin permiso", Toast.LENGTH_LONG).show();
                 }//else
             }//case
         }//switch
     }//onRequestPermissionsResult
 
-    private void insercion() {
-        String var = "chisme";
+    private boolean checkPermission(String permission) {
+        int check=ContextCompat.checkSelfPermission(this,permission);
+        return (check==PackageManager.PERMISSION_GRANTED);
+    }//checkPermission
+
+    private static String consultar(int Id, Context context) {
+        String motivacion = "No encontrada";
         try {
-            SQLiteDatabase inser = dmbs.getWritableDatabase();
-            String SQL = "INSERT INTO CHISME VALUES(NULL, 'Este chismee es otro ...')";
-            inser.execSQL(SQL);
-            inser.close();
-            System.out.println("SE PUDO INSERTAR! "+var);
+            SQLiteDatabase select = basedatos.getWritableDatabase();
+            Cursor c=select.rawQuery("SELECT*FROM MOTIVACION WHERE IDMOTIVACION="+Id,null);
+
+            if(c.moveToFirst()){
+                do{
+                    motivacion=c.getString(1);
+                }//do
+                while (c.moveToNext());
+                select.close();
+            }//if
+            else{
+                Toast.makeText(context,"No hay datos que mostrar",Toast.LENGTH_SHORT).show();
+            }//else
         }//try
         catch (SQLException e) {
-            System.out.println("ERROR! " + e.getMessage());
+            Toast.makeText(context,"Error de consulta",Toast.LENGTH_LONG).show();
         }//catch
-    }//insercion
-}
+        return motivacion;
+    }//consultar
+
+    public static void mandarMotivacion(String telefono, String[] partes, Context context){
+        if(partes[0].equals("MOTIVACION")&& partes[1].equals("5050")){
+            int id=(int)(Math.random()*10)+1;
+
+            SmsManager smsManager=SmsManager.getDefault();
+            smsManager.sendTextMessage(telefono,null,consultar(id,context),null,null);
+
+            Toast.makeText(context,"Mensaje enviado al "+telefono,Toast.LENGTH_SHORT).show();
+        }//if
+        else{
+            Toast.makeText(context,"Mensaje erroneo",Toast.LENGTH_SHORT).show();
+        }//else
+    }//mandarMotivacion
+}//class
